@@ -1,0 +1,46 @@
+# Build outputs
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Generated binaries/libraries
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+tpms_solver
+
+# Runtime/user settings
+tpms_studio.ini
+imgui.ini
+*.log
+
+# Generated engineering outputs
+*.vtk
+*.vtu
+*.stl
+*.obj
+*.ply
+*.raw
+*.csv
+*.tpms
+*_report.md
+*_result.vtk
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
