@@ -16,6 +16,7 @@ enum class SliceAxis { XY, XZ, YZ };
 enum class ViewDisplayMode { Solid, Surface, Mesh };
 enum class WorkflowTab { Home, Geometry, Meshing, BCs, Solve, Results };
 enum class MeshEngine { GMSH, Netgen, AdvancingFront, MarchingCubes, VoxelTet };
+enum class VolumeMeshTarget { TPMSBody, DomainBox };
 enum class AnalysisType { LinearStatic };
 
 // ── Log entry ────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ struct ProjectState {
 
     // Mesh parameters
     MeshEngine mesh_engine    = MeshEngine::GMSH;
+    VolumeMeshTarget volume_mesh_target = VolumeMeshTarget::TPMSBody;
     float      elem_size      = 2.0f;
     float      elem_size_min  = 0.5f;
     float      elem_size_max  = 4.0f;
@@ -180,7 +182,7 @@ struct ProjectState {
     // ── Gating queries ────────────────────────────────────────────────────────
     bool can_preview()             const { return true; }
     bool can_surface_mesh()        const { return has_geometry; }
-    bool can_volume_mesh()         const { return has_surface_mesh; }
+    bool can_volume_mesh()         const { return has_geometry && (volume_mesh_target == VolumeMeshTarget::DomainBox || has_surface_mesh); }
     bool can_assign_bc()           const { return has_volume_mesh; }
     bool can_validate()            const { return has_volume_mesh; }
     bool can_solve()               const { return validation_ok && !solver_running; }
@@ -265,6 +267,15 @@ struct ProjectState {
         return "Unknown";
     }
     const char* mesh_engine_name() const { return mesh_engine_name(mesh_engine); }
+
+    static const char* volume_mesh_target_name(VolumeMeshTarget target) {
+        switch (target) {
+            case VolumeMeshTarget::TPMSBody:  return "TPMS Body";
+            case VolumeMeshTarget::DomainBox: return "Domain Box";
+        }
+        return "Unknown";
+    }
+    const char* volume_mesh_target_name() const { return volume_mesh_target_name(volume_mesh_target); }
 };
 
 } // namespace tpms

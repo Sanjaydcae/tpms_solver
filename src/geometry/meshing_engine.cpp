@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 namespace tpms::geometry {
 
@@ -107,13 +108,28 @@ std::string volume_summary(const ProjectState& state, int nodes, int tets) {
     std::snprintf(
         buf,
         sizeof(buf),
-        "Volume mesh built with %s: %d nodes, %d tetrahedra, target element size %.2f mm",
+        "Volume mesh built with %s for %s: %d nodes, %d tetrahedra, target element size %.2f mm",
         volume_engine_label(state.mesh_engine),
+        state.volume_mesh_target_name(),
         nodes,
         tets,
         state.elem_size
     );
     return buf;
+}
+
+std::vector<int> sample_indices(int count, int step) {
+    std::vector<int> indices;
+    if (count <= 0) return indices;
+
+    indices.push_back(0);
+    for (int i = step; i < count - 1; i += step) {
+        indices.push_back(i);
+    }
+    if (indices.back() != count - 1) {
+        indices.push_back(count - 1);
+    }
+    return indices;
 }
 
 SurfaceMeshData build_surface_mesh_data(const ProjectState& state, const FieldData& field) {
@@ -229,6 +245,10 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
     const float hx = state.size_x * 0.5f;
     const float hy = state.size_y * 0.5f;
     const float hz = state.size_z * 0.5f;
+    const bool mesh_domain_box = state.volume_mesh_target == VolumeMeshTarget::DomainBox;
+    const std::vector<int> xs = sample_indices(field.nx, step);
+    const std::vector<int> ys = sample_indices(field.ny, step);
+    const std::vector<int> zs = sample_indices(field.nz, step);
 
     std::unordered_map<std::uint64_t, int> node_map;
     auto node_key = [](int ix, int iy, int iz) -> std::uint64_t {
@@ -254,18 +274,25 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
         }
     };
 
-    for (int iz = 0; iz < field.nz - step; iz += step) {
-        for (int iy = 0; iy < field.ny - step; iy += step) {
-            for (int ix = 0; ix < field.nx - step; ix += step) {
+    for (size_t kz = 0; kz + 1 < zs.size(); ++kz) {
+        for (size_t ky = 0; ky + 1 < ys.size(); ++ky) {
+            for (size_t kx = 0; kx + 1 < xs.size(); ++kx) {
+                const int ix0 = xs[kx];
+                const int ix1 = xs[kx + 1];
+                const int iy0 = ys[ky];
+                const int iy1 = ys[ky + 1];
+                const int iz0 = zs[kz];
+                const int iz1 = zs[kz + 1];
+
                 float v[8] = {
-                    field.at(ix, iy, iz),
-                    field.at(ix + step, iy, iz),
-                    field.at(ix + step, iy + step, iz),
-                    field.at(ix, iy + step, iz),
-                    field.at(ix, iy, iz + step),
-                    field.at(ix + step, iy, iz + step),
-                    field.at(ix + step, iy + step, iz + step),
-                    field.at(ix, iy + step, iz + step)
+                    field.at(ix0, iy0, iz0),
+                    field.at(ix1, iy0, iz0),
+                    field.at(ix1, iy1, iz0),
+                    field.at(ix0, iy1, iz0),
+                    field.at(ix0, iy0, iz1),
+                    field.at(ix1, iy0, iz1),
+                    field.at(ix1, iy1, iz1),
+                    field.at(ix0, iy1, iz1)
                 };
                 int inside_count = 0;
                 float avg = 0.f;
@@ -278,17 +305,17 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
                 const bool occupied = (inside_count == 8)
                     || (avg <= 0.f && inside_count >= 2)
                     || (mixed_sign && inside_count >= 3);
-                if (!occupied) continue;
+                if (!mesh_domain_box && !occupied) continue;
 
                 int n[8] = {
-                    get_node(ix, iy, iz),
-                    get_node(ix + step, iy, iz),
-                    get_node(ix + step, iy + step, iz),
-                    get_node(ix, iy + step, iz),
-                    get_node(ix, iy, iz + step),
-                    get_node(ix + step, iy, iz + step),
-                    get_node(ix + step, iy + step, iz + step),
-                    get_node(ix, iy + step, iz + step)
+                    get_node(ix0, iy0, iz0),
+                    get_node(ix1, iy0, iz0),
+                    get_node(ix1, iy1, iz0),
+                    get_node(ix0, iy1, iz0),
+                    get_node(ix0, iy0, iz1),
+                    get_node(ix1, iy0, iz1),
+                    get_node(ix1, iy1, iz1),
+                    get_node(ix0, iy1, iz1)
                 };
 
                 add_tet(n[0], n[1], n[3], n[4]);
@@ -332,11 +359,15 @@ MeshValidationReport validate_surface_meshing(const ProjectState& state, const F
 
 MeshValidationReport validate_volume_meshing(const ProjectState& state) {
     MeshValidationReport report;
-    if (!state.has_surface_mesh) {
+    if (!state.has_geometry) {
         report.ok = false;
-        report.errors.push_back("Generate a surface mesh before creating a volume mesh.");
+        report.errors.push_back("Generate geometry before creating a volume mesh.");
     }
-    if (state.surf_tris <= 0 || state.surf_nodes <= 0) {
+    if (state.volume_mesh_target == VolumeMeshTarget::TPMSBody && !state.has_surface_mesh) {
+        report.ok = false;
+        report.errors.push_back("Generate a surface mesh before creating a TPMS body volume mesh.");
+    }
+    if (state.volume_mesh_target == VolumeMeshTarget::TPMSBody && (state.surf_tris <= 0 || state.surf_nodes <= 0)) {
         report.ok = false;
         report.errors.push_back("Surface mesh statistics are missing.");
     }

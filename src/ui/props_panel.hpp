@@ -211,6 +211,16 @@ inline void draw_props_panel(ProjectState& state) {
         ImGui::TextDisabled("Use GMSH or Netgen for the cleanest general-purpose mesh. Marching Cubes and Voxel Tet are faster preview-oriented options.");
         ImGui::PopTextWrapPos();
 
+        props_header("VOLUME TARGET");
+        const char* targets[] = { "TPMS Body", "Domain Box" };
+        int target = static_cast<int>(state.volume_mesh_target);
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::Combo("Volume Mesh Target##vol_target", &target, targets, 2))
+            state.volume_mesh_target = static_cast<VolumeMeshTarget>(target);
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("TPMS Body meshes the lattice itself. Domain Box creates a full cuboid block mesh for checking the box/domain envelope.");
+        ImGui::PopTextWrapPos();
+
         begin_props_table();
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0); ImGui::TextDisabled("Target Size");
