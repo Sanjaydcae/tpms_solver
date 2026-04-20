@@ -13,6 +13,7 @@
 #include <vtkDataSetMapper.h>
 #include <vtkFloatArray.h>
 #include <vtkGenericOpenGLRenderWindow.h>
+#include <vtkGeometryFilter.h>
 #include <vtkLookupTable.h>
 #include <vtkNew.h>
 #include <vtkOpenGLFramebufferObject.h>
@@ -110,6 +111,11 @@ static vtkSmartPointer<vtkUnstructuredGrid> vol_to_ug(const geometry::VolumeMesh
 }
 
 static vtkSmartPointer<vtkLookupTable> rainbow_lut(double lo, double hi) {
+    if (std::abs(hi - lo) < 1e-12) {
+        const double pad = std::max(std::abs(lo) * 0.05, 1e-9);
+        lo -= pad;
+        hi += pad;
+    }
     auto lut = vtkSmartPointer<vtkLookupTable>::New();
     lut->SetRange(lo, hi);
     lut->SetHueRange(0.667, 0.0);
@@ -118,6 +124,15 @@ static vtkSmartPointer<vtkLookupTable> rainbow_lut(double lo, double hi) {
     lut->SetNumberOfColors(512);
     lut->Build();
     return lut;
+}
+
+static vtkSmartPointer<vtkPolyData> boundary_surface(vtkUnstructuredGrid* ug) {
+    auto geom = vtkSmartPointer<vtkGeometryFilter>::New();
+    geom->SetInputData(ug);
+    geom->Update();
+    auto pd = vtkSmartPointer<vtkPolyData>::New();
+    pd->ShallowCopy(geom->GetOutput());
+    return pd;
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -222,15 +237,21 @@ void VtkViewport::set_volume_mesh(const geometry::VolumeMeshData* mesh) {
     if (d_->vol_wire_actor) { d_->ren->RemoveActor(d_->vol_wire_actor); d_->vol_wire_actor = nullptr; }
     if (!mesh) return;
 
-    auto mapper = vtkSmartPointer<vtkDataSetMapper>::New();
-    mapper->SetInputData(vol_to_ug(*mesh));
+    auto ug = vol_to_ug(*mesh);
+    auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    mapper->SetInputData(boundary_surface(ug));
 
     d_->vol_wire_actor = vtkSmartPointer<vtkActor>::New();
     d_->vol_wire_actor->SetMapper(mapper);
-    d_->vol_wire_actor->GetProperty()->SetRepresentationToWireframe();
-    d_->vol_wire_actor->GetProperty()->SetColor(0.25, 0.60, 0.95);
-    d_->vol_wire_actor->GetProperty()->SetLineWidth(0.7f);
-    d_->vol_wire_actor->GetProperty()->SetOpacity(0.45);
+    d_->vol_wire_actor->GetProperty()->SetRepresentationToSurface();
+    d_->vol_wire_actor->GetProperty()->EdgeVisibilityOn();
+    d_->vol_wire_actor->GetProperty()->SetColor(0.64, 0.74, 0.88);
+    d_->vol_wire_actor->GetProperty()->SetEdgeColor(0.18, 0.30, 0.45);
+    d_->vol_wire_actor->GetProperty()->SetLineWidth(0.35f);
+    d_->vol_wire_actor->GetProperty()->SetOpacity(0.86);
+    d_->vol_wire_actor->GetProperty()->SetAmbient(0.22);
+    d_->vol_wire_actor->GetProperty()->SetDiffuse(0.78);
+    d_->vol_wire_actor->GetProperty()->SetSpecular(0.10);
     d_->ren->AddActor(d_->vol_wire_actor);
     d_->ren->ResetCamera();
 }
@@ -242,6 +263,7 @@ void VtkViewport::clear_result() {
     if (d_->result_actor)      { d_->ren->RemoveActor(d_->result_actor);       d_->result_actor      = nullptr; }
     if (d_->result_edge_actor) { d_->ren->RemoveActor(d_->result_edge_actor);  d_->result_edge_actor = nullptr; }
     if (d_->scalar_bar)        { d_->ren2d->RemoveActor2D(d_->scalar_bar);     d_->scalar_bar        = nullptr; }
+    if (d_->vol_wire_actor) d_->vol_wire_actor->SetVisibility(true);
     d_->info_text->SetInput("");
 }
 
@@ -269,8 +291,10 @@ void VtkViewport::set_result(
     auto lut = rainbow_lut(lo, hi);
 
     // Solid colored result
-    auto mapper = vtkSmartPointer<vtkDataSetMapper>::New();
-    mapper->SetInputData(ug);
+    auto boundary = boundary_surface(ug);
+
+    auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    mapper->SetInputData(boundary);
     mapper->SetLookupTable(lut);
     mapper->SetScalarRange(lo, hi);
     mapper->SetScalarModeToUsePointData();
@@ -278,18 +302,21 @@ void VtkViewport::set_result(
     d_->result_actor->SetMapper(mapper);
     d_->result_actor->GetProperty()->SetAmbient(0.25);
     d_->result_actor->GetProperty()->SetDiffuse(0.75);
+    d_->result_actor->GetProperty()->SetSpecular(0.08);
     d_->ren->AddActor(d_->result_actor);
 
-    // Mesh edges over result (thin, semi-transparent)
-    auto emapper = vtkSmartPointer<vtkDataSetMapper>::New();
-    emapper->SetInputData(ug);
+    if (d_->vol_wire_actor) d_->vol_wire_actor->SetVisibility(false);
+
+    // Boundary mesh edges only, not all internal tetrahedra.
+    auto emapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    emapper->SetInputData(boundary);
     emapper->ScalarVisibilityOff();
     d_->result_edge_actor = vtkSmartPointer<vtkActor>::New();
     d_->result_edge_actor->SetMapper(emapper);
     d_->result_edge_actor->GetProperty()->SetRepresentationToWireframe();
-    d_->result_edge_actor->GetProperty()->SetColor(0.05, 0.05, 0.05);
-    d_->result_edge_actor->GetProperty()->SetLineWidth(0.4f);
-    d_->result_edge_actor->GetProperty()->SetOpacity(0.25);
+    d_->result_edge_actor->GetProperty()->SetColor(0.02, 0.03, 0.04);
+    d_->result_edge_actor->GetProperty()->SetLineWidth(0.25f);
+    d_->result_edge_actor->GetProperty()->SetOpacity(0.18);
     d_->ren->AddActor(d_->result_edge_actor);
 
     // Scalar bar — left side, like PrePoMax

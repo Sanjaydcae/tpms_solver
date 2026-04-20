@@ -153,6 +153,31 @@ void ViewportPanel::draw_3d_view(const ProjectState& state, int w, int h) {
                     IM_COL32(120, 150, 190, 255), msg);
     }
 
+    if (state.solver_running) {
+        const float bw = std::min(420.0f, std::max(240.0f, w * 0.42f));
+        const float bh = 74.0f;
+        const ImVec2 box_min{canvas.x + (w - bw) * 0.5f, canvas.y + 54.0f};
+        const ImVec2 box_max{box_min.x + bw, box_min.y + bh};
+        dl->AddRectFilled(box_min, box_max, IM_COL32(12, 20, 30, 222), 8.0f);
+        dl->AddRect(box_min, box_max, IM_COL32(88, 147, 214, 230), 8.0f, 0, 1.2f);
+        const char* title = "Solver running";
+        dl->AddText({box_min.x + 16, box_min.y + 10}, IM_COL32(218, 235, 255, 255), title);
+        char line[160];
+        std::snprintf(line, sizeof line, "Iteration %d / %d   relative residual %.3e",
+                      state.solver_current_iteration,
+                      state.solver_max_iter,
+                      state.solver_current_relative_residual);
+        dl->AddText({box_min.x + 16, box_min.y + 32}, IM_COL32(162, 190, 224, 255), line);
+        const float px0 = box_min.x + 16;
+        const float px1 = box_max.x - 16;
+        const float py0 = box_max.y - 18;
+        const float py1 = box_max.y - 8;
+        dl->AddRectFilled({px0, py0}, {px1, py1}, IM_COL32(41, 54, 70, 255), 5.0f);
+        const float fill = std::clamp(state.solver_progress, 0.0f, 1.0f);
+        dl->AddRectFilled({px0, py0}, {px0 + (px1 - px0) * fill, py1},
+                          IM_COL32(42, 157, 244, 255), 5.0f);
+    }
+
     // Invisible button captures mouse events
     ImGui::InvisibleButton("##vtk_vp", {(float)w, (float)h});
     const bool hovered = ImGui::IsItemHovered();
