@@ -433,6 +433,9 @@ PreprocessedModel build_preprocessed_model(
                 model.K_val.push_back(alpha);
                 model.f[dof] += alpha * 0.0;   // prescribed displacement = 0
                 model.constrained_dofs.push_back(dof);
+                model.penalty_dofs.push_back(dof);
+                model.penalty_alpha.push_back(alpha);
+                model.penalty_prescribed.push_back(0.0);
             }
             ++total_fixed;
         }
@@ -453,6 +456,9 @@ PreprocessedModel build_preprocessed_model(
                 model.K_val.push_back(alpha);
                 model.f[dof] += alpha * prescribed[d];
                 model.constrained_dofs.push_back(dof);
+                model.penalty_dofs.push_back(dof);
+                model.penalty_alpha.push_back(alpha);
+                model.penalty_prescribed.push_back(prescribed[d]);
             }
             ++total_loaded;
         }

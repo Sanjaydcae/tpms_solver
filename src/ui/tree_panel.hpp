@@ -86,9 +86,12 @@ inline void draw_tree_panel(const ProjectState& state) {
     if (branch("Results", false)) {
         if (state.has_results) {
             leaf("  Total Displacement", !state.displacement_result_scalars.empty());
+            leaf("  X Displacement", !state.displacement_x_result_scalars.empty());
+            leaf("  Y Displacement", !state.displacement_y_result_scalars.empty());
+            leaf("  Z Displacement", !state.displacement_z_result_scalars.empty());
             leaf("  Von Mises Stress", !state.von_mises_result_scalars.empty());
             leaf("  Equivalent Strain", !state.strain_result_scalars.empty());
-            leaf("  Reaction Force (future)", false);
+            leaf("  Reaction Force", !state.reaction_force_result_scalars.empty());
         } else {
             leaf("  (no results)", false);
         }

@@ -155,8 +155,12 @@ static void clear_geometry_preview(tpms::ProjectState& state) {
     state.validation_summary.clear();
     state.result_scalars.clear();
     state.displacement_result_scalars.clear();
+    state.displacement_x_result_scalars.clear();
+    state.displacement_y_result_scalars.clear();
+    state.displacement_z_result_scalars.clear();
     state.von_mises_result_scalars.clear();
     state.strain_result_scalars.clear();
+    state.reaction_force_result_scalars.clear();
     state.displacement_solution.clear();
     state.field_outputs.clear();
 }
@@ -235,8 +239,12 @@ static void clear_solver_results(tpms::ProjectState& state) {
     state.field_outputs.clear();
     state.result_scalars.clear();
     state.displacement_result_scalars.clear();
+    state.displacement_x_result_scalars.clear();
+    state.displacement_y_result_scalars.clear();
+    state.displacement_z_result_scalars.clear();
     state.von_mises_result_scalars.clear();
     state.strain_result_scalars.clear();
+    state.reaction_force_result_scalars.clear();
     state.displacement_solution.clear();
     state.fem_summary.clear();
 }
@@ -269,10 +277,18 @@ static void apply_solve_output(tpms::ProjectState& state, const AsyncSolveOutput
 
     state.displacement_solution = result.displacement;
     state.displacement_result_scalars = result.displacement_magnitude;
+    state.displacement_x_result_scalars = result.displacement_x;
+    state.displacement_y_result_scalars = result.displacement_y;
+    state.displacement_z_result_scalars = result.displacement_z;
+    state.reaction_force_result_scalars = result.reaction_force_magnitude;
     set_active_scalar_result(state, state.displacement_result_scalars,
                              "Total Displacement", "ALL", "mm");
     state.field_outputs.clear();
     state.field_outputs.push_back({"DISP", "Total Displacement", "mm"});
+    state.field_outputs.push_back({"DISP", "UX", "mm"});
+    state.field_outputs.push_back({"DISP", "UY", "mm"});
+    state.field_outputs.push_back({"DISP", "UZ", "mm"});
+    state.field_outputs.push_back({"REACTION", "Reaction Force", "N"});
 
     if (stress.ok && !stress.nodal_von_mises.empty()) {
         state.von_mises_result_scalars = stress.nodal_von_mises;
@@ -367,6 +383,10 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
         action.type != A::None &&
         action.type != A::ShowVonMises &&
         action.type != A::ShowDisplacement &&
+        action.type != A::ShowDisplacementX &&
+        action.type != A::ShowDisplacementY &&
+        action.type != A::ShowDisplacementZ &&
+        action.type != A::ShowReactionForce &&
         action.type != A::ShowStrain) {
         state.log_warn("Solver is running. Wait for completion before changing the model or exporting.");
         return;
@@ -863,6 +883,33 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
             state.log_error("No displacement result available. Run Solve first.");
         }
         break;
+    case A::ShowDisplacementX:
+        if (!state.displacement_x_result_scalars.empty()) {
+            set_active_scalar_result(state, state.displacement_x_result_scalars,
+                                     "Directional Displacement X", "UX", "mm");
+            state.log_info("Displaying X displacement.");
+        } else {
+            state.log_error("No X displacement result available. Run Solve first.");
+        }
+        break;
+    case A::ShowDisplacementY:
+        if (!state.displacement_y_result_scalars.empty()) {
+            set_active_scalar_result(state, state.displacement_y_result_scalars,
+                                     "Directional Displacement Y", "UY", "mm");
+            state.log_info("Displaying Y displacement.");
+        } else {
+            state.log_error("No Y displacement result available. Run Solve first.");
+        }
+        break;
+    case A::ShowDisplacementZ:
+        if (!state.displacement_z_result_scalars.empty()) {
+            set_active_scalar_result(state, state.displacement_z_result_scalars,
+                                     "Directional Displacement Z", "UZ", "mm");
+            state.log_info("Displaying Z displacement.");
+        } else {
+            state.log_error("No Z displacement result available. Run Solve first.");
+        }
+        break;
     case A::ShowStrain:
         if (!state.strain_result_scalars.empty()) {
             set_active_scalar_result(state, state.strain_result_scalars,
@@ -870,6 +917,15 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
             state.log_info("Displaying equivalent strain.");
         } else {
             state.log_error("No strain result available. Run Solve after validating the model.");
+        }
+        break;
+    case A::ShowReactionForce:
+        if (!state.reaction_force_result_scalars.empty()) {
+            set_active_scalar_result(state, state.reaction_force_result_scalars,
+                                     "Reaction Force", "RF", "N");
+            state.log_info("Displaying reaction force.");
+        } else {
+            state.log_error("No reaction force result available. Run Solve first.");
         }
         break;
     }

@@ -77,8 +77,12 @@ inline void draw_props_panel(ProjectState& state) {
         state.validation_summary.clear();
         state.result_scalars.clear();
         state.displacement_result_scalars.clear();
+        state.displacement_x_result_scalars.clear();
+        state.displacement_y_result_scalars.clear();
+        state.displacement_z_result_scalars.clear();
         state.von_mises_result_scalars.clear();
         state.strain_result_scalars.clear();
+        state.reaction_force_result_scalars.clear();
         state.displacement_solution.clear();
         state.field_outputs.clear();
         state.dirty = true;
@@ -210,6 +214,12 @@ inline void draw_props_panel(ProjectState& state) {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("Use GMSH or Netgen for the cleanest general-purpose mesh. Marching Cubes and Voxel Tet are faster preview-oriented options.");
         ImGui::PopTextWrapPos();
+
+        props_header("ELEMENT TYPES");
+        begin_props_table();
+        prop_row("Surface", "Tri3 only");
+        prop_row("Volume", "Tet4 only");
+        end_props_table();
 
         props_header("VOLUME TARGET");
         const char* targets[] = { "TPMS Body", "Domain Box" };
@@ -555,9 +565,13 @@ inline void draw_props_panel(ProjectState& state) {
         if (state.has_results) {
             props_header("AVAILABLE OUTPUTS");
             begin_props_table();
-            prop_row("Displacement", state.displacement_result_scalars.empty() ? "Missing" : "Ready");
+            prop_row("Displacement Total", state.displacement_result_scalars.empty() ? "Missing" : "Ready");
+            prop_row("Displacement X", state.displacement_x_result_scalars.empty() ? "Missing" : "Ready");
+            prop_row("Displacement Y", state.displacement_y_result_scalars.empty() ? "Missing" : "Ready");
+            prop_row("Displacement Z", state.displacement_z_result_scalars.empty() ? "Missing" : "Ready");
             prop_row("Von Mises", state.von_mises_result_scalars.empty() ? "Missing" : "Ready");
             prop_row("Strain", state.strain_result_scalars.empty() ? "Missing" : "Ready");
+            prop_row("Reaction Force", state.reaction_force_result_scalars.empty() ? "Missing" : "Ready");
             end_props_table();
 
             props_header("COLOUR MAP");

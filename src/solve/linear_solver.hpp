@@ -23,6 +23,10 @@ struct LinearSolveResult {
 
     // Nodal scalar output for the result viewer.
     std::vector<float> displacement_magnitude;
+    std::vector<float> displacement_x;
+    std::vector<float> displacement_y;
+    std::vector<float> displacement_z;
+    std::vector<float> reaction_force_magnitude;
 
     // Relative residual history, including the initial value.
     std::vector<float> residual_history;

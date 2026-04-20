@@ -109,6 +109,10 @@ HealthCheckReport run_model_health_checks(const ProjectState& state) {
             pass(r, "Displacement result is finite.");
         else
             fail(r, "Displacement result is missing or not finite.");
+        if (!state.reaction_force_result_scalars.empty() && all_finite(state.reaction_force_result_scalars))
+            pass(r, "Reaction force result is finite.");
+        else
+            warn(r, "Reaction force result is missing or not finite.");
         if (!state.von_mises_result_scalars.empty() && all_finite(state.von_mises_result_scalars))
             pass(r, "Von Mises result is finite.");
         else

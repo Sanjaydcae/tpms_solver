@@ -82,9 +82,13 @@ ReportResult export_markdown_report(
         f << "- Component: " << state.active_component << "\n";
         f << "- Minimum: " << state.result_min << " " << state.result_unit << " at node " << state.result_min_node << "\n";
         f << "- Maximum: " << state.result_max << " " << state.result_unit << " at node " << state.result_max_node << "\n";
-        f << "- Displacement Output: " << (state.displacement_result_scalars.empty() ? "Missing" : "Ready") << "\n";
+        f << "- Displacement Total Output: " << (state.displacement_result_scalars.empty() ? "Missing" : "Ready") << "\n";
+        f << "- Displacement X Output: " << (state.displacement_x_result_scalars.empty() ? "Missing" : "Ready") << "\n";
+        f << "- Displacement Y Output: " << (state.displacement_y_result_scalars.empty() ? "Missing" : "Ready") << "\n";
+        f << "- Displacement Z Output: " << (state.displacement_z_result_scalars.empty() ? "Missing" : "Ready") << "\n";
         f << "- Von Mises Output: " << (state.von_mises_result_scalars.empty() ? "Missing" : "Ready") << "\n";
         f << "- Strain Output: " << (state.strain_result_scalars.empty() ? "Missing" : "Ready") << "\n";
+        f << "- Reaction Force Output: " << (state.reaction_force_result_scalars.empty() ? "Missing" : "Ready") << "\n";
         if (!state.result_summary.empty()) f << "- Summary: " << state.result_summary << "\n";
     } else {
         f << "- No results available\n";

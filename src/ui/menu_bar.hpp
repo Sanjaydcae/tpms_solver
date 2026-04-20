@@ -127,11 +127,26 @@ inline RibbonAction draw_main_menu_bar(ProjectState& state) {
         if (ImGui::MenuItem("Von Mises", nullptr, false, state.can_show_results())) {
             action.type = RibbonAction::ShowVonMises;
         }
-        if (ImGui::MenuItem("Displacement", nullptr, false, state.can_show_results())) {
-            action.type = RibbonAction::ShowDisplacement;
+        if (ImGui::BeginMenu("Displacement", state.can_show_results())) {
+            if (ImGui::MenuItem("Total", nullptr, false, state.can_show_results())) {
+                action.type = RibbonAction::ShowDisplacement;
+            }
+            if (ImGui::MenuItem("X Component", nullptr, false, state.can_show_results())) {
+                action.type = RibbonAction::ShowDisplacementX;
+            }
+            if (ImGui::MenuItem("Y Component", nullptr, false, state.can_show_results())) {
+                action.type = RibbonAction::ShowDisplacementY;
+            }
+            if (ImGui::MenuItem("Z Component", nullptr, false, state.can_show_results())) {
+                action.type = RibbonAction::ShowDisplacementZ;
+            }
+            ImGui::EndMenu();
         }
         if (ImGui::MenuItem("Strain", nullptr, false, state.can_show_results())) {
             action.type = RibbonAction::ShowStrain;
+        }
+        if (ImGui::MenuItem("Reaction Force", nullptr, false, state.can_show_results())) {
+            action.type = RibbonAction::ShowReactionForce;
         }
         ImGui::Separator();
         if (ImGui::MenuItem("Export Active Result (.vtk)", nullptr, false, state.can_show_results())) {

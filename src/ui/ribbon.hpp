@@ -22,7 +22,9 @@ struct RibbonAction {
         // Solve
         Validate, Solve,
         // Results
-        ShowVonMises, ShowDisplacement, ShowStrain,
+        ShowVonMises,
+        ShowDisplacement, ShowDisplacementX, ShowDisplacementY, ShowDisplacementZ,
+        ShowStrain, ShowReactionForce,
         ExportReport, ExportActiveResult, OpenPyVista, RunHealthCheck,
         // File / project
         NewProject, OpenProject, SaveProject, ExitApp,
@@ -380,8 +382,11 @@ inline RibbonAction draw_ribbon(ProjectState& state) {
         if (ribbon_tile_button("vm", "Stress", RibbonGlyph::Result, state.can_show_results()))
             action.type = RibbonAction::ShowVonMises;
         ImGui::SameLine();
-        if (ribbon_tile_button("disp", "Disp", RibbonGlyph::Result, state.can_show_results()))
+        if (ribbon_tile_button("disp", "U Total", RibbonGlyph::Result, state.can_show_results()))
             action.type = RibbonAction::ShowDisplacement;
+        ImGui::SameLine();
+        if (ribbon_tile_button("react", "Reaction", RibbonGlyph::Result, state.can_show_results()))
+            action.type = RibbonAction::ShowReactionForce;
         ImGui::SameLine();
         if (ribbon_tile_button("strain", "Strain", RibbonGlyph::Result, state.can_show_results()))
             action.type = RibbonAction::ShowStrain;

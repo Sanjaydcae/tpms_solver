@@ -56,12 +56,54 @@ std::vector<double> jacobi_inverse(const preprocess::PreprocessedModel& model) {
 
 void fill_displacement_magnitude(LinearSolveResult& out, int n_nodes) {
     out.displacement_magnitude.assign((std::size_t)n_nodes, 0.0f);
+    out.displacement_x.assign((std::size_t)n_nodes, 0.0f);
+    out.displacement_y.assign((std::size_t)n_nodes, 0.0f);
+    out.displacement_z.assign((std::size_t)n_nodes, 0.0f);
     for (int n = 0; n < n_nodes; ++n) {
         const double ux = out.displacement[(std::size_t)n * 3 + 0];
         const double uy = out.displacement[(std::size_t)n * 3 + 1];
         const double uz = out.displacement[(std::size_t)n * 3 + 2];
         const double mag = std::sqrt(ux * ux + uy * uy + uz * uz);
+        out.displacement_x[(std::size_t)n] = static_cast<float>(ux);
+        out.displacement_y[(std::size_t)n] = static_cast<float>(uy);
+        out.displacement_z[(std::size_t)n] = static_cast<float>(uz);
         out.displacement_magnitude[(std::size_t)n] = static_cast<float>(mag);
+    }
+}
+
+void fill_reaction_force_magnitude(
+    LinearSolveResult& out,
+    const preprocess::PreprocessedModel& model
+) {
+    out.reaction_force_magnitude.assign((std::size_t)model.n_nodes, 0.0f);
+    std::vector<double> rx((std::size_t)model.n_nodes, 0.0);
+    std::vector<double> ry((std::size_t)model.n_nodes, 0.0);
+    std::vector<double> rz((std::size_t)model.n_nodes, 0.0);
+
+    const std::size_t n = std::min({
+        model.penalty_dofs.size(),
+        model.penalty_alpha.size(),
+        model.penalty_prescribed.size()
+    });
+
+    for (std::size_t i = 0; i < n; ++i) {
+        const int dof = model.penalty_dofs[i];
+        if (dof < 0 || dof >= model.n_dofs) continue;
+        const int node = dof / 3;
+        const int comp = dof % 3;
+        const double u = out.displacement[(std::size_t)dof];
+        const double reaction = model.penalty_alpha[i] * (model.penalty_prescribed[i] - u);
+        if (comp == 0) rx[(std::size_t)node] += reaction;
+        if (comp == 1) ry[(std::size_t)node] += reaction;
+        if (comp == 2) rz[(std::size_t)node] += reaction;
+    }
+
+    for (int node = 0; node < model.n_nodes; ++node) {
+        const double x = rx[(std::size_t)node];
+        const double y = ry[(std::size_t)node];
+        const double z = rz[(std::size_t)node];
+        out.reaction_force_magnitude[(std::size_t)node] =
+            static_cast<float>(std::sqrt(x * x + y * y + z * z));
     }
 }
 
@@ -108,6 +150,7 @@ LinearSolveResult solve_linear_static(
         out.message = "Zero load vector; displacement solution is zero.";
         out.residual_history.push_back(0.0f);
         fill_displacement_magnitude(out, model.n_nodes);
+        fill_reaction_force_magnitude(out, model);
         return out;
     }
     if (progress_callback) progress_callback(0, 1.0);
@@ -131,6 +174,7 @@ LinearSolveResult solve_linear_static(
             out.message = "Solver stopped because the stiffness matrix appears singular.";
             out.iterations = it - 1;
             fill_displacement_magnitude(out, model.n_nodes);
+            fill_reaction_force_magnitude(out, model);
             return out;
         }
 
@@ -159,6 +203,7 @@ LinearSolveResult solve_linear_static(
         if (!std::isfinite(rz_new) || std::abs(rz_old) <= 1e-300) {
             out.message = "Solver stopped due to numerical breakdown.";
             fill_displacement_magnitude(out, model.n_nodes);
+            fill_reaction_force_magnitude(out, model);
             return out;
         }
         const double beta = rz_new / rz_old;
@@ -170,6 +215,7 @@ LinearSolveResult solve_linear_static(
 
     out.ok = true;
     fill_displacement_magnitude(out, model.n_nodes);
+    fill_reaction_force_magnitude(out, model);
 
     char buf[256];
     std::snprintf(buf, sizeof buf,

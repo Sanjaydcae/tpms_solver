@@ -139,8 +139,12 @@ struct ProjectState {
     // Per-node scalar data for current result (Module 6 will fill these)
     std::vector<float> result_scalars;
     std::vector<float> displacement_result_scalars;
+    std::vector<float> displacement_x_result_scalars;
+    std::vector<float> displacement_y_result_scalars;
+    std::vector<float> displacement_z_result_scalars;
     std::vector<float> von_mises_result_scalars;
     std::vector<float> strain_result_scalars;
+    std::vector<float> reaction_force_result_scalars;
     std::vector<double> displacement_solution;
 
     // Mesh stats (filled after generation)

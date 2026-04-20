@@ -49,6 +49,11 @@ struct PreprocessedModel {
     // Dirichlet-constrained DOF indices (for postprocessing/reference).
     std::vector<int>    constrained_dofs;
 
+    // Penalty constraints used for displacement BCs and reaction recovery.
+    std::vector<int>    penalty_dofs;
+    std::vector<double> penalty_alpha;
+    std::vector<double> penalty_prescribed;
+
     // Face node sets (retained for postprocessing reactions).
     std::vector<NodeSet> face_sets;
 

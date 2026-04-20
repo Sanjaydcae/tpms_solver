@@ -17,8 +17,10 @@
 - Linear static solver workflow with live progress
 - FEM post-processing:
   - Total displacement
+  - Directional displacement X/Y/Z
   - Von Mises stress
   - Equivalent strain
+  - Reaction force
 - Active result export to VTK
 - Mesh and geometry export
 - Markdown report export
