@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "../state/project_state.hpp"
@@ -43,13 +44,18 @@ private:
     GLuint line_vao_ = 0;
     GLuint line_vbo_ = 0;
     GLuint line_shader_program_ = 0;
+    GLuint result_vao_ = 0;
+    GLuint result_vbo_ = 0;
+    GLuint result_shader_program_ = 0;
     int vp_w_ = 0;
     int vp_h_ = 0;
     int mesh_vertex_count_ = 0;
     int line_vertex_count_ = 0;
+    int result_vertex_count_ = 0;
     const void* cached_field_ = nullptr;
     const void* cached_surface_mesh_ = nullptr;
     const void* cached_volume_mesh_ = nullptr;
+    std::string cached_result_key_;
     std::vector<PreviewTriangle> preview_tris_;
 
     void resize_fbo(int width, int height);
@@ -58,6 +64,7 @@ private:
     void upload_preview_mesh();
     void upload_surface_mesh(const void* surface_mesh_ptr);
     void upload_line_mesh(const void* surface_mesh_ptr, const void* volume_mesh_ptr);
+    void upload_result_mesh(const ProjectState& state);
 };
 
 } // namespace tpms::ui::preview

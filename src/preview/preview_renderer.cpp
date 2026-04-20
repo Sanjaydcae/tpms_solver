@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <map>
 #include <vector>
 
 namespace tpms::ui::preview {
@@ -126,6 +127,14 @@ static GLuint link_program(GLuint vs, GLuint fs) {
     return prog;
 }
 
+static Vec3 jet_color(float t) {
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float r = std::clamp(1.5f - std::abs(4.0f * t - 3.0f), 0.0f, 1.0f);
+    const float g = std::clamp(1.5f - std::abs(4.0f * t - 2.0f), 0.0f, 1.0f);
+    const float b = std::clamp(1.5f - std::abs(4.0f * t - 1.0f), 0.0f, 1.0f);
+    return {r, g, b};
+}
+
 std::vector<geometry::MeshVec3> decimate_line_vertices(
     const std::vector<geometry::MeshVec3>& input,
     std::size_t max_segments
@@ -159,8 +168,11 @@ void PreviewRenderer::cleanup() {
     if (mesh_vao_) glDeleteVertexArrays(1, &mesh_vao_);
     if (line_vbo_) glDeleteBuffers(1, &line_vbo_);
     if (line_vao_) glDeleteVertexArrays(1, &line_vao_);
+    if (result_vbo_) glDeleteBuffers(1, &result_vbo_);
+    if (result_vao_) glDeleteVertexArrays(1, &result_vao_);
     if (shader_program_) glDeleteProgram(shader_program_);
     if (line_shader_program_) glDeleteProgram(line_shader_program_);
+    if (result_shader_program_) glDeleteProgram(result_shader_program_);
 }
 
 void PreviewRenderer::resize_fbo(int width, int height) {
@@ -259,10 +271,48 @@ void PreviewRenderer::ensure_gl_resources() {
         );
     }
 
+    if (result_shader_program_ == 0) {
+        const char* result_vs = R"(
+            #version 330 core
+            layout(location = 0) in vec3 a_pos;
+            layout(location = 1) in vec3 a_normal;
+            layout(location = 2) in vec3 a_color;
+            uniform mat4 u_mvp;
+            uniform mat4 u_model;
+            out vec3 v_normal;
+            out vec3 v_color;
+            void main() {
+                v_normal = mat3(u_model) * a_normal;
+                v_color = a_color;
+                gl_Position = u_mvp * vec4(a_pos, 1.0);
+            }
+        )";
+        const char* result_fs = R"(
+            #version 330 core
+            in vec3 v_normal;
+            in vec3 v_color;
+            out vec4 frag_color;
+            void main() {
+                vec3 n = normalize(v_normal);
+                if (!gl_FrontFacing) n = -n;
+                vec3 l = normalize(vec3(0.45, -0.65, 0.72));
+                float diff = max(dot(n, l), 0.0);
+                vec3 color = v_color * (0.42 + 0.72 * diff);
+                frag_color = vec4(color, 1.0);
+            }
+        )";
+        result_shader_program_ = link_program(
+            compile_shader(GL_VERTEX_SHADER, result_vs),
+            compile_shader(GL_FRAGMENT_SHADER, result_fs)
+        );
+    }
+
     if (mesh_vao_ == 0) glGenVertexArrays(1, &mesh_vao_);
     if (mesh_vbo_ == 0) glGenBuffers(1, &mesh_vbo_);
     if (line_vao_ == 0) glGenVertexArrays(1, &line_vao_);
     if (line_vbo_ == 0) glGenBuffers(1, &line_vbo_);
+    if (result_vao_ == 0) glGenVertexArrays(1, &result_vao_);
+    if (result_vbo_ == 0) glGenBuffers(1, &result_vbo_);
 }
 
 void PreviewRenderer::rebuild_preview_mesh(const ProjectState& state) {
@@ -426,6 +476,87 @@ void PreviewRenderer::upload_line_mesh(const void* surface_mesh_ptr, const void*
     line_vertex_count_ = (int)lines.size();
 }
 
+void PreviewRenderer::upload_result_mesh(const ProjectState& state) {
+    ensure_gl_resources();
+    const auto* volume_mesh = static_cast<const geometry::VolumeMeshData*>(state.volume_mesh_data);
+    if (!volume_mesh || volume_mesh->nodes.empty() || volume_mesh->tets.empty() ||
+        state.result_scalars.size() != volume_mesh->nodes.size()) {
+        result_vertex_count_ = 0;
+        return;
+    }
+
+    struct Face {
+        int a = 0, b = 0, c = 0;
+        int count = 0;
+    };
+    std::map<std::array<int, 3>, Face> faces;
+    auto add_face = [&](int a, int b, int c) {
+        std::array<int, 3> key = {a, b, c};
+        std::sort(key.begin(), key.end());
+        auto& f = faces[key];
+        if (f.count == 0) {
+            f.a = a; f.b = b; f.c = c;
+        }
+        ++f.count;
+    };
+
+    for (const auto& t : volume_mesh->tets) {
+        add_face(t.a, t.c, t.b);
+        add_face(t.a, t.b, t.d);
+        add_face(t.b, t.c, t.d);
+        add_face(t.c, t.a, t.d);
+    }
+
+    float lo = state.result_scalars.front();
+    float hi = lo;
+    for (float v : state.result_scalars) {
+        lo = std::min(lo, v);
+        hi = std::max(hi, v);
+    }
+    const float denom = std::max(hi - lo, 1e-12f);
+
+    struct GpuVertex {
+        float px, py, pz;
+        float nx, ny, nz;
+        float r, g, b;
+    };
+    std::vector<GpuVertex> vertices;
+    vertices.reserve(faces.size() * 3);
+
+    auto push = [&](int idx, const Vec3& normal) {
+        const auto& p = volume_mesh->nodes[(std::size_t)idx];
+        const float s = (state.result_scalars[(std::size_t)idx] - lo) / denom;
+        const Vec3 c = jet_color(s);
+        vertices.push_back({p.x, p.y, p.z, normal.x, normal.y, normal.z, c.x, c.y, c.z});
+    };
+
+    for (const auto& [_, f] : faces) {
+        if (f.count != 1) continue;
+        const auto& pa = volume_mesh->nodes[(std::size_t)f.a];
+        const auto& pb = volume_mesh->nodes[(std::size_t)f.b];
+        const auto& pc = volume_mesh->nodes[(std::size_t)f.c];
+        const Vec3 a{pa.x, pa.y, pa.z};
+        const Vec3 b{pb.x, pb.y, pb.z};
+        const Vec3 c{pc.x, pc.y, pc.z};
+        const Vec3 n = normalize(cross(b - a, c - a));
+        push(f.a, n);
+        push(f.b, n);
+        push(f.c, n);
+    }
+
+    glBindVertexArray(result_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, result_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(vertices.size() * sizeof(GpuVertex)), vertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GpuVertex), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(GpuVertex), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GpuVertex), (void*)(6 * sizeof(float)));
+    glBindVertexArray(0);
+    result_vertex_count_ = (int)vertices.size();
+}
+
 void PreviewRenderer::render(
     const ProjectState& state,
     int width,
@@ -441,13 +572,24 @@ void PreviewRenderer::render(
 
     auto* field = static_cast<geometry::FieldData*>(state.field_data);
     auto* surface_mesh = static_cast<geometry::SurfaceMeshData*>(state.surface_mesh_data);
+    const bool show_result = state.has_results && !state.result_scalars.empty() && state.volume_mesh_data;
+    const std::string result_key = show_result
+        ? state.active_result + "|" + state.active_component + "|" + std::to_string(state.result_scalars.size()) + "|" + std::to_string(state.result_max)
+        : std::string{};
 
-    if (!field || field->empty()) {
+    if (show_result) {
+        if (cached_result_key_ != result_key || cached_volume_mesh_ != state.volume_mesh_data) {
+            upload_result_mesh(state);
+            cached_result_key_ = result_key;
+            cached_volume_mesh_ = state.volume_mesh_data;
+        }
+    } else if (!field || field->empty()) {
         cached_field_ = nullptr;
         cached_surface_mesh_ = nullptr;
         cached_volume_mesh_ = nullptr;
         mesh_vertex_count_ = 0;
         line_vertex_count_ = 0;
+        result_vertex_count_ = 0;
     } else if (state.view_display_mode == ViewDisplayMode::Mesh) {
         if (cached_surface_mesh_ != state.surface_mesh_data || cached_volume_mesh_ != state.volume_mesh_data) {
             upload_line_mesh(state.surface_mesh_data, state.volume_mesh_data);
@@ -475,9 +617,10 @@ void PreviewRenderer::render(
     glClearColor(0.965f, 0.975f, 0.988f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    const bool has_mesh_view = state.view_display_mode == ViewDisplayMode::Mesh && line_vertex_count_ > 0;
+    const bool has_result_view = show_result && result_vertex_count_ > 0;
+    const bool has_mesh_view = !show_result && state.view_display_mode == ViewDisplayMode::Mesh && line_vertex_count_ > 0;
     const bool has_surface_view = state.view_display_mode != ViewDisplayMode::Mesh && mesh_vertex_count_ > 0;
-    if (has_mesh_view || has_surface_view) {
+    if (has_result_view || has_mesh_view || has_surface_view) {
         const float aspect = vp_h_ > 0 ? (float)vp_w_ / (float)vp_h_ : 1.0f;
         const float radius = 0.5f * std::max({state.size_x, state.size_y, state.size_z, 1.0f});
         const float az = azimuth * 3.14159265f / 180.0f;
@@ -494,7 +637,15 @@ void PreviewRenderer::render(
         const Mat4 proj = perspective(45.0f * 3.14159265f / 180.0f, aspect, 0.1f, 1000.0f);
         const Mat4 mvp = multiply(proj, multiply(view, model));
 
-        if (state.view_display_mode == ViewDisplayMode::Mesh) {
+        if (has_result_view) {
+            glUseProgram(result_shader_program_);
+            glUniformMatrix4fv(glGetUniformLocation(result_shader_program_, "u_mvp"), 1, GL_FALSE, mvp.m.data());
+            glUniformMatrix4fv(glGetUniformLocation(result_shader_program_, "u_model"), 1, GL_FALSE, model.m.data());
+            glBindVertexArray(result_vao_);
+            glDrawArrays(GL_TRIANGLES, 0, result_vertex_count_);
+            glBindVertexArray(0);
+            glUseProgram(0);
+        } else if (state.view_display_mode == ViewDisplayMode::Mesh) {
             glUseProgram(line_shader_program_);
             glUniformMatrix4fv(glGetUniformLocation(line_shader_program_, "u_mvp"), 1, GL_FALSE, mvp.m.data());
             glUniform3f(glGetUniformLocation(line_shader_program_, "u_color"), 0.18f, 0.39f, 0.66f);

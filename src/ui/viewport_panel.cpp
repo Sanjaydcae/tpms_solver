@@ -86,7 +86,10 @@ void ViewportPanel::draw_3d_view(const ProjectState& state, int w, int h) {
     }
 
     // ── Result scalar field ───────────────────────────────────────────────────
-    const std::string res_key = state.active_result + "|" + state.active_component;
+    const std::string res_key =
+        state.active_result + "|" + state.active_component + "|" +
+        std::to_string(state.result_min) + "|" + std::to_string(state.result_max) + "|" +
+        std::to_string(state.result_scalars.size());
     if (state.has_results && !state.result_scalars.empty()) {
         if (res_key != cached_res_label_ || cached_res_ != vol_ptr) {
             cached_res_       = vol_ptr;
@@ -176,6 +179,36 @@ void ViewportPanel::draw_3d_view(const ProjectState& state, int w, int h) {
         const float fill = std::clamp(state.solver_progress, 0.0f, 1.0f);
         dl->AddRectFilled({px0, py0}, {px0 + (px1 - px0) * fill, py1},
                           IM_COL32(42, 157, 244, 255), 5.0f);
+    }
+
+    if (state.has_results && !state.result_scalars.empty()) {
+        const float lx = canvas.x + 14.0f;
+        const float ly = canvas.y + 54.0f;
+        const float lw = 18.0f;
+        const float lh = std::min(260.0f, std::max(150.0f, h * 0.38f));
+        dl->AddRectFilled({lx - 10, ly - 24}, {lx + 155, ly + lh + 28}, IM_COL32(12, 20, 30, 190), 7.0f);
+        dl->AddText({lx - 2, ly - 19}, IM_COL32(225, 238, 255, 255), state.active_result.c_str());
+        auto jet = [](float t) -> ImU32 {
+            t = std::clamp(t, 0.0f, 1.0f);
+            const float r = std::clamp(1.5f - std::abs(4.0f * t - 3.0f), 0.0f, 1.0f);
+            const float g = std::clamp(1.5f - std::abs(4.0f * t - 2.0f), 0.0f, 1.0f);
+            const float b = std::clamp(1.5f - std::abs(4.0f * t - 1.0f), 0.0f, 1.0f);
+            return IM_COL32((int)(r * 255), (int)(g * 255), (int)(b * 255), 255);
+        };
+        const int bands = 72;
+        for (int i = 0; i < bands; ++i) {
+            const float t0 = (float)i / (float)bands;
+            const float t1 = (float)(i + 1) / (float)bands;
+            const float y0 = ly + lh * (1.0f - t1);
+            const float y1 = ly + lh * (1.0f - t0);
+            dl->AddRectFilled({lx, y0}, {lx + lw, y1 + 1}, jet(t1));
+        }
+        dl->AddRect({lx, ly}, {lx + lw, ly + lh}, IM_COL32(220, 230, 245, 220), 2.0f);
+        char max_buf[64], min_buf[64];
+        std::snprintf(max_buf, sizeof max_buf, "%.4g %s", state.result_max, state.result_unit.c_str());
+        std::snprintf(min_buf, sizeof min_buf, "%.4g %s", state.result_min, state.result_unit.c_str());
+        dl->AddText({lx + lw + 8, ly - 4}, IM_COL32(225, 238, 255, 255), max_buf);
+        dl->AddText({lx + lw + 8, ly + lh - 10}, IM_COL32(225, 238, 255, 255), min_buf);
     }
 
     // Invisible button captures mouse events
