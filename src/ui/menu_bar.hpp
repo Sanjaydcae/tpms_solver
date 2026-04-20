@@ -137,6 +137,9 @@ inline RibbonAction draw_main_menu_bar(ProjectState& state) {
         if (ImGui::MenuItem("Export Active Result (.vtk)", nullptr, false, state.can_show_results())) {
             action.type = RibbonAction::ExportActiveResult;
         }
+        if (ImGui::MenuItem("Open in PyVista", nullptr, false, state.has_volume_mesh)) {
+            action.type = RibbonAction::OpenPyVista;
+        }
         if (ImGui::MenuItem("Generate Report (.md)", nullptr, false, true)) {
             action.type = RibbonAction::ExportReport;
         }
@@ -156,6 +159,9 @@ inline RibbonAction draw_main_menu_bar(ProjectState& state) {
     if (ImGui::BeginMenu("Tools")) {
         if (ImGui::MenuItem("Model Health Check")) {
             action.type = RibbonAction::RunHealthCheck;
+        }
+        if (ImGui::MenuItem("Open Active Result in PyVista", nullptr, false, state.has_volume_mesh)) {
+            action.type = RibbonAction::OpenPyVista;
         }
         ImGui::EndMenu();
     }

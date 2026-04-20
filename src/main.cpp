@@ -2,7 +2,9 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <array>
+#include <filesystem>
 #include <future>
 #include <cmath>
 #include <memory>
@@ -68,6 +70,34 @@ struct SolverRuntime {
 };
 
 static SolverRuntime g_solver_runtime;
+
+static std::string shell_quote(const std::string& value) {
+    std::string quoted = "'";
+    for (char c : value) {
+        if (c == '\'') quoted += "'\\''";
+        else quoted += c;
+    }
+    quoted += "'";
+    return quoted;
+}
+
+static std::string pyvista_viewer_script_path() {
+    namespace fs = std::filesystem;
+    const std::array<std::string, 5> candidates = {
+        "tools/pyvista_viewer.py",
+        "../tools/pyvista_viewer.py",
+        "../../tools/pyvista_viewer.py",
+        "../tpms_solver/tools/pyvista_viewer.py",
+        "/home/sanjay/Desktop/tpms_solver/tools/pyvista_viewer.py"
+    };
+
+    for (const auto& candidate : candidates) {
+        if (fs::exists(candidate)) {
+            return candidate;
+        }
+    }
+    return {};
+}
 
 static void clear_geometry_preview(tpms::ProjectState& state) {
     auto* field        = static_cast<tpms::geometry::FieldData*>(state.field_data);
@@ -390,6 +420,51 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
         auto r = tpms::io::export_vtk_ugrid_with_point_scalar(
             *vm, state.result_scalars, state.active_result, path);
         r.ok ? state.log_info(r.message) : state.log_error(r.message);
+        break;
+    }
+
+    case A::OpenPyVista: {
+        auto* vm = static_cast<tpms::geometry::VolumeMeshData*>(state.volume_mesh_data);
+        if (!vm) {
+            state.log_error("Generate a volume mesh before opening PyVista.");
+            break;
+        }
+
+        const std::string export_path = "/tmp/tpms_studio_pyvista_result.vtk";
+        tpms::io::ExportResult export_result;
+        std::string scalar_name;
+
+        if (state.has_results && !state.result_scalars.empty()) {
+            scalar_name = state.active_result;
+            export_result = tpms::io::export_vtk_ugrid_with_point_scalar(
+                *vm, state.result_scalars, state.active_result, export_path);
+        } else {
+            export_result = tpms::io::export_vtk_ugrid(*vm, export_path);
+        }
+
+        if (!export_result.ok) {
+            state.log_error(export_result.message);
+            break;
+        }
+
+        const std::string script_path = pyvista_viewer_script_path();
+        if (script_path.empty()) {
+            state.log_error("PyVista viewer script not found. Expected tools/pyvista_viewer.py.");
+            break;
+        }
+
+        std::string command = "python3 " + shell_quote(script_path) + " " + shell_quote(export_path);
+        if (!scalar_name.empty()) {
+            command += " --scalar " + shell_quote(scalar_name);
+        }
+        command += " >/tmp/tpms_studio_pyvista.log 2>&1 &";
+
+        const int rc = std::system(command.c_str());
+        if (rc == 0) {
+            state.log_info("Opening PyVista viewer. If no window appears, install PyVista and check /tmp/tpms_studio_pyvista.log.");
+        } else {
+            state.log_error("Failed to launch PyVista. Install with: python3 -m pip install --user pyvista");
+        }
         break;
     }
 

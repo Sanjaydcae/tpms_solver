@@ -11,6 +11,8 @@ sudo apt-get install -y \
     pkg-config \
     git \
     gh \
+    python3-pip \
+    python3-venv \
     libglfw3-dev \
     libgl1-mesa-dev \
     libglu1-mesa-dev \
@@ -24,4 +26,5 @@ sudo apt-get install -y \
 
 echo ""
 echo "==> All dependencies installed."
+echo "    Optional PyVista preview: python3 -m pip install --user pyvista"
 echo "    Now run:  bash build.sh"

@@ -60,6 +60,15 @@ sudo apt-get install -y gh
 gh auth login
 ```
 
+Optional for high-quality PyVista preview:
+
+```bash
+sudo apt-get install -y python3-pip python3-venv
+python3 -m pip install --user pyvista
+```
+
+After generating a volume mesh or solver result, use `Results > Open in PyVista` to open an interactive external preview with rotation, axes, mesh edges, and result colour maps.
+
 ## Build
 
 ```bash

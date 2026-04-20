@@ -23,7 +23,7 @@ struct RibbonAction {
         Validate, Solve,
         // Results
         ShowVonMises, ShowDisplacement, ShowStrain,
-        ExportReport, ExportActiveResult, RunHealthCheck,
+        ExportReport, ExportActiveResult, OpenPyVista, RunHealthCheck,
         // File / project
         NewProject, OpenProject, SaveProject, ExitApp,
         // Geometry exports
