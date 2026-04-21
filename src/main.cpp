@@ -37,6 +37,7 @@
 #include "ui/theme.hpp"
 #include "ui/layout.hpp"
 #include "ui/menu_bar.hpp"
+#include "ui/workflow_bar.hpp"
 #include "ui/tree_panel.hpp"
 #include "ui/props_panel.hpp"
 #include "ui/viewport_panel.hpp"
@@ -143,6 +144,7 @@ static void clear_geometry_preview(tpms::ProjectState& state) {
     state.solver_initial_residual = 0.f;
     state.solver_final_residual = 0.f;
     state.solver_current_relative_residual = 0.f;
+    state.solver_backend_name = "Not selected";
     state.solver_status_text.clear();
     state.solver_summary.clear();
     state.solver_residual_history.clear();
@@ -222,6 +224,7 @@ static void clear_solver_results(tpms::ProjectState& state) {
     state.solver_initial_residual = 0.f;
     state.solver_final_residual = 0.f;
     state.solver_current_relative_residual = 0.f;
+    state.solver_backend_name = "Not selected";
     state.solver_status_text.clear();
     state.solver_summary.clear();
     state.solver_residual_history.clear();
@@ -825,9 +828,11 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
         const bool use_ccx = !ccx_bin.empty();
 
         if (use_ccx) {
+            state.solver_backend_name = "CalculiX";
             state.solver_status_text = "Running CalculiX linear static solver...";
             state.log_info("Module 5 solve started in background: CalculiX Linear Static.");
         } else {
+            state.solver_backend_name = "Internal Prototype";
             state.solver_status_text = "Running linear static solver...";
             state.log_info("Module 5 solve started in background: Linear Static.");
         }
@@ -1021,10 +1026,14 @@ int main() {
         if (menu_action.type != tpms::ui::RibbonAction::None)
             handle_action(menu_action, state, request_close);
 
+        auto workflow_action = tpms::ui::draw_workflow_bar(state);
+        if (workflow_action.type != tpms::ui::RibbonAction::None)
+            handle_action(workflow_action, state, request_close);
+
         poll_solver_runtime(state);
 
         // Full-window dockspace
-        tpms::ui::begin_dockspace();
+        tpms::ui::begin_dockspace(48.f, 24.f);
 
         // ── Panels — pin to dock slots on first launch ────────────────────────
         auto& dids = tpms::ui::get_dock_ids();

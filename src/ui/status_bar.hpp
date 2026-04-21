@@ -1,6 +1,7 @@
 #pragma once
 
 #include <imgui.h>
+#include <cstdio>
 #include "theme.hpp"
 #include "../state/project_state.hpp"
 
@@ -41,7 +42,11 @@ inline void draw_status_bar(const ProjectState& state) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(col_accent(), "%s", status);
 
-    const char* right = "Units: mm-N-MPa | License: H2one Cleantech";
+    char right_buf[192];
+    std::snprintf(right_buf, sizeof right_buf,
+                  "Units: mm-N-MPa | Solver: %s | License: H2one Cleantech",
+                  state.solver_backend_name.c_str());
+    const char* right = right_buf;
     const float rw = ImGui::CalcTextSize(right).x;
     const float avail = ImGui::GetWindowContentRegionMax().x;
     if (avail - ImGui::GetCursorPosX() > rw + 24.f) {

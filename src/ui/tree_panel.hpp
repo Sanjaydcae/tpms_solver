@@ -75,6 +75,7 @@ inline void draw_tree_panel(const ProjectState& state) {
     // Solve
     if (branch("Solve")) {
         leaf(("  " + std::string(state.analysis_type_name())).c_str(), true);
+        leaf(("  Backend: " + state.solver_backend_name).c_str(), state.solver_has_run || state.solver_running);
         leaf(state.solver_has_run
              ? (state.solver_converged ? "  Solver: Converged" : "  Solver: Approximate")
              : "  Solver: Not run",

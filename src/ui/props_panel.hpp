@@ -61,6 +61,7 @@ inline void draw_props_panel(ProjectState& state) {
         state.solver_initial_residual = 0.f;
         state.solver_final_residual = 0.f;
         state.solver_current_relative_residual = 0.f;
+        state.solver_backend_name = "Not selected";
         state.solver_status_text.clear();
         state.solver_summary.clear();
         state.solver_residual_history.clear();
@@ -485,6 +486,9 @@ inline void draw_props_panel(ProjectState& state) {
         ImGui::TextDisabled("Analysis");
         ImGui::SameLine(140);
         ImGui::TextUnformatted(state.analysis_type_name());
+        ImGui::TextDisabled("Backend");
+        ImGui::SameLine(140);
+        ImGui::TextUnformatted(state.solver_backend_name.c_str());
         ImGui::SetNextItemWidth(-1);
         ImGui::DragInt("Max Iterations", &state.solver_max_iter, 10, 10, 10000);
         ImGui::SetNextItemWidth(-1);

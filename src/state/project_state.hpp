@@ -113,6 +113,7 @@ struct ProjectState {
     float solver_initial_residual = 0.f;
     float solver_final_residual   = 0.f;
     float solver_current_relative_residual = 0.f;
+    std::string solver_backend_name = "Not selected";
     std::string solver_status_text;
     std::string solver_summary;
     std::vector<float> solver_residual_history;

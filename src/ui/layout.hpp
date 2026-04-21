@@ -30,10 +30,10 @@ inline DockIDs& get_dock_ids() {
 
 // Returns the dockspace ID and (re)builds the layout on first launch.
 // Call BEFORE drawing any panel windows each frame.
-inline ImGuiID begin_dockspace() {
+inline ImGuiID begin_dockspace(float top_offset = 0.f, float bottom_offset = 0.f) {
     ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(vp->WorkPos);
-    ImGui::SetNextWindowSize(vp->WorkSize);
+    ImGui::SetNextWindowPos({vp->WorkPos.x, vp->WorkPos.y + top_offset});
+    ImGui::SetNextWindowSize({vp->WorkSize.x, vp->WorkSize.y - top_offset - bottom_offset});
     ImGui::SetNextWindowViewport(vp->ID);
 
     constexpr ImGuiWindowFlags host_flags =

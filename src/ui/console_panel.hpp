@@ -110,6 +110,7 @@ private:
                                    state.solver_status_text.empty() ? "Solving..." : state.solver_status_text.c_str());
             }
             ImGui::Text("State: %s", state.solver_running ? "Running" : "Finished");
+            ImGui::Text("Backend: %s", state.solver_backend_name.c_str());
             ImGui::Text("Convergence: %s", state.solver_converged ? "Converged" : "Approximate / stopped");
             ImGui::Text("Iteration: %d / %d", state.solver_current_iteration, state.solver_max_iter);
             ImGui::Text("Relative residual: %.3e", state.solver_current_relative_residual);
