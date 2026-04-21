@@ -238,17 +238,16 @@ void VtkViewport::set_volume_mesh(const geometry::VolumeMeshData* mesh) {
     if (!mesh) return;
 
     auto ug = vol_to_ug(*mesh);
-    auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInputData(boundary_surface(ug));
+    auto mapper = vtkSmartPointer<vtkDataSetMapper>::New();
+    mapper->SetInputData(ug);
+    mapper->ScalarVisibilityOff();
 
     d_->vol_wire_actor = vtkSmartPointer<vtkActor>::New();
     d_->vol_wire_actor->SetMapper(mapper);
-    d_->vol_wire_actor->GetProperty()->SetRepresentationToSurface();
-    d_->vol_wire_actor->GetProperty()->EdgeVisibilityOn();
-    d_->vol_wire_actor->GetProperty()->SetColor(0.64, 0.74, 0.88);
-    d_->vol_wire_actor->GetProperty()->SetEdgeColor(0.18, 0.30, 0.45);
-    d_->vol_wire_actor->GetProperty()->SetLineWidth(0.35f);
-    d_->vol_wire_actor->GetProperty()->SetOpacity(0.86);
+    d_->vol_wire_actor->GetProperty()->SetRepresentationToWireframe();
+    d_->vol_wire_actor->GetProperty()->SetColor(0.10, 0.32, 0.62);
+    d_->vol_wire_actor->GetProperty()->SetLineWidth(0.45f);
+    d_->vol_wire_actor->GetProperty()->SetOpacity(0.92);
     d_->vol_wire_actor->GetProperty()->SetAmbient(0.22);
     d_->vol_wire_actor->GetProperty()->SetDiffuse(0.78);
     d_->vol_wire_actor->GetProperty()->SetSpecular(0.10);
