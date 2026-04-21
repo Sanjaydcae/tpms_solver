@@ -12,10 +12,15 @@ compile_commands.json
 *.obj
 *.a
 *.so
+*.so.*
 *.dll
 *.dylib
 *.exe
 tpms_solver
+
+# Local external solver drops. Keep GPL solver binaries/sources out of the
+# proprietary TPMS Studio repository; install ccx externally instead.
+src/ccx_*/
 
 # Runtime/user settings
 tpms_studio.ini

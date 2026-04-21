@@ -18,9 +18,9 @@ license conflict unless the whole product is relicensed compatibly.
 
 ## Immediate Corrections Needed
 
-1. Mesh view must show actual Tet4/C3D4 connectivity, not only the exterior surface.
+1. Mesh view must show actual Tet4/C3D4 connectivity, not only the exterior surface. Status: initial VTK wireframe correction added.
 2. Volume meshing must move from voxel-split tetrahedra to surface-conforming tetra meshing.
-3. Solver output must be marked as preliminary until benchmarked against CalculiX/PrePoMax.
+3. Solver output must be marked as preliminary until benchmarked against CalculiX/PrePoMax. Status: optional CalculiX job path started.
 4. Result plots must report which solver and element formulation produced the data.
 5. Stress plots must include a warning when constrained-node stress peaks dominate the range.
 
@@ -96,4 +96,3 @@ Before claiming the solver is correct, add benchmark cases:
 - Uniaxial compression block benchmark.
 - 15 mm lattice compression compared against CalculiX.
 - Reaction force balance check: applied force plus support reaction should be near zero.
-

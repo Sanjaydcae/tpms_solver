@@ -15,6 +15,7 @@
 - Material assignment for linear elastic isotropic materials
 - Boundary conditions: fixed support, force load, displacement load
 - Linear static solver workflow with live progress
+- Optional CalculiX (`ccx`) external solver path for PrePoMax-style job execution
 - FEM post-processing:
   - Total displacement
   - Directional displacement X/Y/Z
@@ -70,6 +71,14 @@ python3 -m pip install --user pyvista
 ```
 
 After generating a volume mesh or solver result, use `Results > Open in PyVista` to open an interactive external preview with rotation, axes, mesh edges, and result colour maps.
+
+Optional for CalculiX solving:
+
+```bash
+sudo apt-get install -y calculix-ccx
+```
+
+If `ccx` is available on `PATH`, TPMS Studio uses it for linear static solves. If it is not found, the app falls back to the internal prototype solver. Keep downloaded CalculiX source/binary folders outside git; this repository ignores local `src/ccx_*` folders to avoid mixing external GPL solver code into the proprietary application source.
 
 ## Build
 

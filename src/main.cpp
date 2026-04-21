@@ -27,6 +27,7 @@
 #include "geometry/field_texture.hpp"
 #include "preprocess/preprocess_engine.hpp"
 #include "solve/linear_solver.hpp"
+#include "solve/ccx_solver.hpp"
 #include "fem/fem_core.hpp"
 #include "io/geometry_io.hpp"
 #include "io/project_io.hpp"
@@ -819,9 +820,18 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
         state.solver_progress = 0.01f;
         state.solver_current_iteration = 0;
         state.solver_current_relative_residual = 1.0f;
-        state.solver_status_text = "Running linear static solver...";
+
+        const std::string ccx_bin = tpms::solve::find_ccx_binary();
+        const bool use_ccx = !ccx_bin.empty();
+
+        if (use_ccx) {
+            state.solver_status_text = "Running CalculiX linear static solver...";
+            state.log_info("Module 5 solve started in background: CalculiX Linear Static.");
+        } else {
+            state.solver_status_text = "Running linear static solver...";
+            state.log_info("Module 5 solve started in background: Linear Static.");
+        }
         state.active_tab = tpms::WorkflowTab::Solve;
-        state.log_info("Module 5 solve started in background: Linear Static.");
 
         g_solver_runtime.active = true;
         g_solver_runtime.progress = std::make_shared<std::atomic<float>>(0.01f);
@@ -834,21 +844,36 @@ static void handle_action(tpms::ui::RibbonAction action, tpms::ProjectState& sta
 
         g_solver_runtime.future = std::async(
             std::launch::async,
-            [model_copy, mesh_copy, max_iter, tol, progress, iteration, relative_residual]() mutable {
+            [model_copy, mesh_copy, max_iter, tol, progress, iteration, relative_residual,
+             use_ccx, ccx_bin, state_copy = state]() mutable {
                 AsyncSolveOutput out;
-                out.solve = tpms::solve::solve_linear_static(
-                    model_copy,
-                    max_iter,
-                    tol,
-                    [progress, iteration, relative_residual, max_iter](int it, double rel) {
-                        iteration->store(it);
-                        relative_residual->store(std::isfinite(rel) ? rel : 1.0);
-                        const float p = max_iter > 0
-                            ? std::clamp(static_cast<float>(it) / static_cast<float>(max_iter), 0.01f, 0.95f)
-                            : 0.95f;
-                        progress->store(p);
-                    }
-                );
+
+                if (use_ccx) {
+                    out.solve = tpms::solve::solve_via_ccx(
+                        mesh_copy,
+                        state_copy,
+                        ccx_bin,
+                        [progress, iteration, relative_residual](int it, double rel) {
+                            iteration->store(it);
+                            relative_residual->store(std::isfinite(rel) ? rel : 1.0);
+                            progress->store(std::clamp(0.1f + it * 0.3f, 0.1f, 0.9f));
+                        }
+                    );
+                } else {
+                    out.solve = tpms::solve::solve_linear_static(
+                        model_copy,
+                        max_iter,
+                        tol,
+                        [progress, iteration, relative_residual, max_iter](int it, double rel) {
+                            iteration->store(it);
+                            relative_residual->store(std::isfinite(rel) ? rel : 1.0);
+                            const float p = max_iter > 0
+                                ? std::clamp(static_cast<float>(it) / static_cast<float>(max_iter), 0.01f, 0.95f)
+                                : 0.95f;
+                            progress->store(p);
+                        }
+                    );
+                }
 
                 progress->store(0.97f);
                 if (out.solve.ok && !out.solve.displacement.empty()) {

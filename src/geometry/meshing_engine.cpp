@@ -1,6 +1,7 @@
 #include "meshing_engine.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -251,6 +252,7 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
     const std::vector<int> zs = sample_indices(field.nz, step);
 
     std::unordered_map<std::uint64_t, int> node_map;
+    std::vector<std::array<int, 3>> node_grid; // grid indices (ix,iy,iz) per node
     auto node_key = [](int ix, int iy, int iz) -> std::uint64_t {
         return (std::uint64_t)(ix & 0x1fffff) | ((std::uint64_t)(iy & 0x1fffff) << 21) | ((std::uint64_t)(iz & 0x1fffff) << 42);
     };
@@ -262,16 +264,13 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
         const int idx = (int)out.nodes.size();
         out.nodes.push_back({-hx + ix * dx, -hy + iy * dy, -hz + iz * dz});
         node_map.emplace(key, idx);
+        node_grid.push_back({ix, iy, iz});
         return idx;
     };
 
+    // line_vertices are rebuilt after boundary-node snapping
     auto add_tet = [&](int a, int b, int c, int d) {
         out.tets.push_back({a, b, c, d});
-        const int edges[6][2] = {{a,b},{a,c},{a,d},{b,c},{b,d},{c,d}};
-        for (const auto& e : edges) {
-            out.line_vertices.push_back(out.nodes[e[0]]);
-            out.line_vertices.push_back(out.nodes[e[1]]);
-        }
     };
 
     for (size_t kz = 0; kz + 1 < zs.size(); ++kz) {
@@ -324,6 +323,82 @@ VolumeMeshData build_volume_mesh_data(const ProjectState& state, const FieldData
                 add_tet(n[3], n[4], n[6], n[7]);
                 add_tet(n[1], n[3], n[4], n[6]);
             }
+        }
+    }
+
+    // Snap outside nodes (field > 0) to the TPMS isosurface via a single
+    // Newton step so the mesh boundary conforms to the smooth shell surface
+    // rather than being a staircase approximation of the voxel grid.
+    const std::vector<MeshVec3> original_positions = out.nodes; // save before snapping
+    {
+        const float max_snap = 0.45f * min_spacing * static_cast<float>(step);
+        auto sf = [&](int x, int y, int z) {
+            return field.at(
+                std::clamp(x, 0, field.nx - 1),
+                std::clamp(y, 0, field.ny - 1),
+                std::clamp(z, 0, field.nz - 1)
+            );
+        };
+        for (int ni = 0; ni < (int)out.nodes.size(); ++ni) {
+            const int ix = node_grid[ni][0];
+            const int iy = node_grid[ni][1];
+            const int iz = node_grid[ni][2];
+            const float f0 = field.at(ix, iy, iz);
+            if (f0 <= 0.f) continue; // inside material — no snap needed
+
+            const float gx = (sf(ix+1,iy,iz) - sf(ix-1,iy,iz)) / (2.f * dx);
+            const float gy = (sf(ix,iy+1,iz) - sf(ix,iy-1,iz)) / (2.f * dy);
+            const float gz = (sf(ix,iy,iz+1) - sf(ix,iy,iz-1)) / (2.f * dz);
+            const float g2 = gx*gx + gy*gy + gz*gz;
+            if (g2 < 1e-6f) continue;
+
+            const float t = std::min(f0 / g2, max_snap);
+            out.nodes[ni].x -= t * gx;
+            out.nodes[ni].y -= t * gy;
+            out.nodes[ni].z -= t * gz;
+        }
+    }
+
+    // Post-snap validation: revert nodes that participate in inverted tets
+    // (nonpositive Jacobian determinant would cause CalculiX to abort)
+    {
+        std::vector<bool> reverted(out.nodes.size(), false);
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (const auto& tet : out.tets) {
+                const int ids[4] = {tet.a, tet.b, tet.c, tet.d};
+                const auto& p0 = out.nodes[ids[0]];
+                const auto& p1 = out.nodes[ids[1]];
+                const auto& p2 = out.nodes[ids[2]];
+                const auto& p3 = out.nodes[ids[3]];
+                const float j00=p1.x-p0.x, j01=p2.x-p0.x, j02=p3.x-p0.x;
+                const float j10=p1.y-p0.y, j11=p2.y-p0.y, j12=p3.y-p0.y;
+                const float j20=p1.z-p0.z, j21=p2.z-p0.z, j22=p3.z-p0.z;
+                const float det = j00*(j11*j22-j12*j21)
+                                - j01*(j10*j22-j12*j20)
+                                + j02*(j10*j21-j11*j20);
+                if (det <= 0.f) {
+                    for (int id : ids) {
+                        if (!reverted[id]) {
+                            out.nodes[id] = original_positions[id];
+                            reverted[id] = true;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Rebuild wireframe edges from the (potentially snapped) node positions
+    out.line_vertices.reserve(out.tets.size() * 12);
+    for (const auto& tet : out.tets) {
+        const int ids[4] = {tet.a, tet.b, tet.c, tet.d};
+        const int edges[6][2] = {{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+        for (const auto& e : edges) {
+            out.line_vertices.push_back(out.nodes[ids[e[0]]]);
+            out.line_vertices.push_back(out.nodes[ids[e[1]]]);
         }
     }
 
